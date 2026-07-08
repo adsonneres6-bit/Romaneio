@@ -3,7 +3,7 @@ import { ArrowLeft, Download, Mail, Calendar, KeyRound, Eye, EyeOff, Check, QrCo
 import { changePassword } from '../services/authService';
 import { getLicense, daysRemaining, isFreeTrialLicense, getLicenseStatus, formatDateBR } from '../services/licenseService';
 import { getMyReferralInfo } from '../services/referralService';
-import { getTutorialUrl, toEmbedUrl, getTrialDays } from '../services/settingsService';
+import { getTutorialUrl, toEmbedUrl, getTrialDays, getApkCircuitUrl } from '../services/settingsService';
 import type { UserWithLicenseStatus } from '../services/authService';
 import { PixPaymentPanel } from './PixPaymentPanel';
 
@@ -14,9 +14,6 @@ interface ProfilePageProps {
   defaultTab?: 'profile' | 'payment';
   isInActiveTrial?: boolean;
 }
-
-const CIRCUIT_URL =
-  'https://github.com/adsonneres6-bit/adsonteste_download/releases/latest/download/Circuit.apk';
 
 export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isInActiveTrial = false }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'payment'>(defaultTab);
@@ -35,6 +32,11 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
   const [tutorialLoaded, setTutorialLoaded] = useState(false);
   const [iframeError, setIframeError] = useState(false);
   const [trialDaysConfig, setTrialDaysConfig] = useState<number>(30);
+
+
+
+  // APK Circuit URL state
+  const [apkCircuitUrl, setApkCircuitUrlState] = useState('');
 
   // License state
   const [remaining, setRemaining] = useState(0);
@@ -64,6 +66,7 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
       setTutorialUrl(url);
       setTutorialLoaded(true);
     });
+    getApkCircuitUrl().then(setApkCircuitUrlState);
   }, []);
 
   const embedUrl = tutorialUrl ? toEmbedUrl(tutorialUrl) : '';
@@ -280,9 +283,12 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
                 </button>
                 <button
                   onClick={() => {
-                    window.location.href = CIRCUIT_URL;
+                    if (apkCircuitUrl) {
+                      window.location.href = apkCircuitUrl;
+                    }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-medium text-white transition-colors hover:bg-brand-700"
+                  disabled={!apkCircuitUrl}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
                   Download Circuit

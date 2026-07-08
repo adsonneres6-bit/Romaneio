@@ -51,6 +51,22 @@ import {
 import { TutorialModal, shouldShowTutorial } from './components/TutorialModal';
 import { ReferralModal } from './components/ReferralModal';
 import { UpdateModal } from './components/UpdateModal';
+import { GlobalAnnouncementModal } from './components/GlobalAnnouncementModal';
+import { TutorialsPage } from './components/TutorialsPage';
+import { WelcomeModal } from './components/WelcomeModal';
+import { InfoModal } from './components/InfoModal';
+import {
+  getActiveAnnouncements,
+  confirmAnnouncement,
+  type GlobalAnnouncement,
+} from './services/announcementService';
+import { getTutorialFlexUrl, getTutorialInterfaceUrl, getTutorialFrotaUrl } from './services/settingsService';
+import {
+  hasSeenWelcomeModal,
+  markWelcomeModalSeen,
+  hasSeenInfoModal,
+  markInfoModalSeen,
+} from './services/welcomeService';
 import { usePWAUpdate } from './hooks/usePWAUpdate';
 import {
   getHistory,
@@ -116,6 +132,9 @@ function App() {
 
   const sessionIsAdmin = isAdminUser(user);
 
+  // Skip all user flows for admins (announcements, welcome modals, tutorials, etc.)
+  const shouldShowUserFlows = !sessionIsAdmin;
+
   // Derive license state from user object (already validated during login)
   const userLicenseExpired = user ? !user.licenseStatus.isValid : true;
   const fingerprintTrialExpired = user?.licenseStatus.fingerprintExpired ?? false;
@@ -124,6 +143,15 @@ function App() {
   const [licenseWarning, setLicenseWarning] = useState<string | null>(null);
   const [sessionKicked, setSessionKicked] = useState(false);
   const [adminExpired, setAdminExpired] = useState<string[] | null>(null);
+
+  // Announcements state
+  const [activeAnnouncement, setActiveAnnouncement] = useState<GlobalAnnouncement | null>(null);
+
+  // Tutorial/welcome state
+  const [showTutorialsPage, setShowTutorialsPage] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [hasTutorialsConfigured, setHasTutorialsConfigured] = useState<boolean | null>(null);
 
   // Flag to prevent device verification during logout process
   const isLoggingOutRef = useRef(false);
@@ -290,6 +318,55 @@ function App() {
       setShowPayment(false);
     }
   }, [sessionIsAdmin]);
+
+  // Check for active announcements after user logs in
+  useEffect(() => {
+    if (!user || !shouldShowUserFlows) {
+      setActiveAnnouncement(null);
+      return;
+    }
+
+    const checkAnnouncements = async () => {
+      const announcements = await getActiveAnnouncements('after_login', user.id);
+      if (announcements.length > 0) {
+        setActiveAnnouncement(announcements[0]);
+      }
+    };
+
+    checkAnnouncements();
+  }, [user, shouldShowUserFlows]);
+
+  // Check if any tutorial is configured and show welcome modal for first-time users
+  useEffect(() => {
+    if (!user || !shouldShowUserFlows) {
+      return;
+    }
+
+    const checkTutorialsAndWelcome = async () => {
+      // Check if any tutorial URLs are configured
+      const [interfaceUrl, flexUrl, frotaUrl] = await Promise.all([
+        getTutorialInterfaceUrl(),
+        getTutorialFlexUrl(),
+        getTutorialFrotaUrl(),
+      ]);
+
+      const hasTutorials = !!(interfaceUrl.trim() || flexUrl.trim() || frotaUrl.trim());
+      setHasTutorialsConfigured(hasTutorials);
+
+      if (!hasTutorials) {
+        // No tutorials configured, skip welcome modal
+        return;
+      }
+
+      // Check if user has already seen the welcome modal
+      const seenWelcome = await hasSeenWelcomeModal(user.id);
+      if (!seenWelcome) {
+        setShowWelcomeModal(true);
+      }
+    };
+
+    checkTutorialsAndWelcome();
+  }, [user, shouldShowUserFlows]);
 
   // License warnings - based on already-computed license state from login
   useEffect(() => {
@@ -649,7 +726,6 @@ function App() {
               const currentUser = await getSessionUser();
               setUser(currentUser);
             }
-            if (shouldShowTutorial()) setShowTutorial(true);
           }}
           onRegister={() => setAuthView('register')}
         />
@@ -663,6 +739,20 @@ function App() {
       <div className={dark ? 'dark' : ''}>
         <AdminPage
           onBack={() => setShowAdmin(false)}
+        />
+      </div>
+    );
+  }
+
+  // Tutorials page
+  if (showTutorialsPage && user) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <TutorialsPage
+          userId={user.id}
+          onBack={() => {
+            setShowTutorialsPage(false);
+          }}
         />
       </div>
     );
@@ -809,13 +899,13 @@ function App() {
                       </button>
                       <button
                         onClick={() => {
-                          setShowTutorial(true);
+                          setShowTutorialsPage(true);
                           setMenuOpen(false);
                         }}
                         className="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         <PlayCircle className="h-5 w-5 text-blue-500" />
-                        Tutorial
+                        Tutoriais
                       </button>
                       <button
                         onClick={() => {
@@ -1077,6 +1167,48 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Global Announcement Modal - admins skip */}
+      {activeAnnouncement && user && shouldShowUserFlows && (
+        <GlobalAnnouncementModal
+          announcement={activeAnnouncement}
+          userId={user.id}
+          onConfirm={async () => {
+            await confirmAnnouncement(user.id, activeAnnouncement.id);
+            setActiveAnnouncement(null);
+          }}
+        />
+      )}
+
+      {/* Welcome Modal for first-time users - admins skip */}
+      {showWelcomeModal && user && shouldShowUserFlows && (
+        <WelcomeModal
+          onGoToTutorials={async () => {
+            await markWelcomeModalSeen(user.id);
+            setShowWelcomeModal(false);
+            setShowTutorialsPage(true);
+          }}
+          onAlreadyKnow={async () => {
+            await markWelcomeModalSeen(user.id);
+            setShowWelcomeModal(false);
+            // Check if user has seen the info modal
+            const seenInfo = await hasSeenInfoModal(user.id);
+            if (!seenInfo) {
+              setShowInfoModal(true);
+            }
+          }}
+        />
+      )}
+
+      {/* Info Modal shown after "Já sei usar" - admins skip */}
+      {showInfoModal && user && shouldShowUserFlows && (
+        <InfoModal
+          onConfirm={async () => {
+            await markInfoModalSeen(user.id);
+            setShowInfoModal(false);
+          }}
+        />
+      )}
 
       {needRefresh && <UpdateModal onConfirm={() => updateSW(true)} />}
     </div>

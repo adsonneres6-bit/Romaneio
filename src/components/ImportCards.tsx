@@ -33,6 +33,12 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
   const [frotaResult, setFrotaResult] = useState<{ blob: Blob; fileName: string } | null>(null);
 
   const processFile = async (file: File) => {
+    console.log('[IMPORT CARDS] Starting file processing', {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+      fileType: file.type || 'unknown',
+    });
+
     if (!userId) {
       onError?.('Usuario nao identificado. Faca login novamente.');
       return;
@@ -45,6 +51,10 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
       // Verifica se arquivo ja existe
       const existing = await findByFileName(file.name);
       if (existing) {
+        console.log('[IMPORT CARDS] File already exists in history', {
+          fileName: file.name,
+          existingEntryId: existing.id,
+        });
         setPendingFile(file);
         setExistingEntry(existing);
         setValidating(false);
@@ -54,24 +64,39 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
       const validation = await validateLicenseForImport(userId);
 
       if (!validation.valid) {
+        console.warn('[IMPORT CARDS] License validation failed', {
+          message: validation.message,
+        });
         onError?.(validation.message || 'Sua licenca esta vencida. Renove para importar arquivos.');
         setValidating(false);
         setFileName(null);
         return;
       }
 
+      console.log('[IMPORT CARDS] License validated, starting import');
       setValidating(false);
       setLoading(true);
 
       const { rows, headers } = await importPdf(file);
 
+      console.log('[IMPORT CARDS] Import result', {
+        rowsFound: rows.length,
+        headersCount: headers.length,
+        headers,
+      });
+
       if (rows.length === 0) {
+        console.error('[IMPORT CARDS] IMPORT RETURNED ZERO ROWS - Check PARSE PDF logs for details');
         onError?.('Nenhum pedido encontrado no arquivo.');
       } else {
+        console.log('[IMPORT CARDS] Import successful, passing to callback');
         onImport(rows, headers, file.name);
       }
     } catch (err) {
-      console.error(err);
+      console.error('[IMPORT CARDS] Import error', {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       const msg = err instanceof Error ? err.message : 'Erro ao importar arquivo.';
       onError?.(msg);
     } finally {
@@ -95,6 +120,11 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
   const handleImportAnyway = async () => {
     if (!pendingFile || !userId) return;
 
+    console.log('[IMPORT CARDS] Import anyway (duplicate)', {
+      fileName: pendingFile.name,
+      fileSize: `${(pendingFile.size / 1024).toFixed(2)} KB`,
+    });
+
     setExistingEntry(null);
     setValidating(true);
 
@@ -114,13 +144,22 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
 
       const { rows, headers } = await importPdf(pendingFile);
 
+      console.log('[IMPORT CARDS] Import anyway result', {
+        rowsFound: rows.length,
+        headersCount: headers.length,
+      });
+
       if (rows.length === 0) {
+        console.error('[IMPORT CARDS] IMPORT RETURNED ZERO ROWS - Check PARSE PDF logs for details');
         onError?.('Nenhum pedido encontrado no arquivo.');
       } else {
         onImport(rows, headers, pendingFile.name);
       }
     } catch (err) {
-      console.error(err);
+      console.error('[IMPORT CARDS] Import anyway error', {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       const msg = err instanceof Error ? err.message : 'Erro ao importar arquivo.';
       onError?.(msg);
     } finally {

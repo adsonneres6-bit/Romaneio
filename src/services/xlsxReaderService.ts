@@ -34,25 +34,65 @@ function normalizeHeader(text: string): string {
 }
 
 export async function readXlsxByHeaders(file: File): Promise<XlsxSheetData> {
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-
-  const data = XLSX.utils.sheet_to_json<string[]>(sheet, {
-    header: 1,
-    defval: '',
-    raw: false,
+  const startTime = performance.now();
+  console.log('[XLSX READER] Starting read', {
+    fileName: file.name,
+    fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+    fileType: file.type,
   });
 
-  if (data.length === 0) {
-    return { headers: [], rows: [] };
+  try {
+    const buffer = await file.arrayBuffer();
+    console.log('[XLSX READER] ArrayBuffer read complete', {
+      bufferSize: `${(buffer.byteLength / 1024).toFixed(2)} KB`,
+    });
+
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    console.log('[XLSX READER] Workbook parsed', {
+      sheetCount: workbook.SheetNames.length,
+      sheetNames: workbook.SheetNames,
+    });
+
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+
+    const data = XLSX.utils.sheet_to_json<string[]>(sheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    });
+
+    console.log('[XLSX READER] Sheet data extracted', {
+      sheetName,
+      totalRows: data.length,
+      hasHeader: data.length > 0,
+    });
+
+    if (data.length === 0) {
+      console.warn('[XLSX READER] No data in sheet, returning empty');
+      return { headers: [], rows: [] };
+    }
+
+    const headers = (data[0] ?? []).map((h) => String(h ?? ''));
+    const body = data.slice(1).map((row) => row.map((c) => String(c ?? '')));
+
+    const elapsed = performance.now() - startTime;
+    console.log('[XLSX READER] Read complete', {
+      headers,
+      dataRows: body.length,
+      processingTimeMs: elapsed.toFixed(2),
+    });
+
+    return { headers, rows: body };
+  } catch (err) {
+    const elapsed = performance.now() - startTime;
+    console.error('[XLSX READER] Read failed', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      processingTimeMs: elapsed.toFixed(2),
+    });
+    throw err;
   }
-
-  const headers = (data[0] ?? []).map((h) => String(h ?? ''));
-  const body = data.slice(1).map((row) => row.map((c) => String(c ?? '')));
-
-  return { headers, rows: body };
 }
 
 export function findColumnIndices(headers: string[]): ColumnIndices {

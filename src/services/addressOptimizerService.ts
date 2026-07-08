@@ -3,7 +3,6 @@ import {
   readXlsxByHeaders,
   findColumnIndices,
   createXlsxBlob,
-  buildDateSuffix,
 } from './xlsxReaderService';
 
 export interface AddressOptimizeResult {
@@ -13,13 +12,24 @@ export interface AddressOptimizeResult {
 }
 
 export async function optimizeAddressesFile(file: File): Promise<AddressOptimizeResult> {
+  const startTime = performance.now();
+  console.log('[ADDRESS OPTIMIZER] Starting optimization', {
+    fileName: file.name,
+    fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+  });
+
   const { headers, rows } = await readXlsxByHeaders(file);
 
   if (rows.length === 0) {
+    console.warn('[ADDRESS OPTIMIZER] No rows found, returning empty');
     return { processedCount: 0, outputFileName: '', blob: new Blob() };
   }
 
   const indices = findColumnIndices(headers);
+  console.log('[ADDRESS OPTIMIZER] Column indices found', {
+    headers,
+    indices,
+  });
 
   if (indices.destinationAddress === -1) {
     throw new Error(
@@ -28,6 +38,8 @@ export async function optimizeAddressesFile(file: File): Promise<AddressOptimize
   }
 
   let processedCount = 0;
+  let unchangedCount = 0;
+  let alreadyCorrectCount = 0;
 
   const optimizedRows = rows.map((row) => {
     const addressCell = row[indices.destinationAddress]?.trim();
@@ -39,7 +51,12 @@ export async function optimizeAddressesFile(file: File): Promise<AddressOptimize
         processedCount++;
       } else if (optimized) {
         row[indices.destinationAddress] = optimized;
+        alreadyCorrectCount++;
+      } else {
+        unchangedCount++;
       }
+    } else {
+      unchangedCount++;
     }
 
     return row;
@@ -51,6 +68,16 @@ export async function optimizeAddressesFile(file: File): Promise<AddressOptimize
   const outputFileName = `EnderecosOtimizados_${day}_${month}.xlsx`;
 
   const blob = createXlsxBlob(headers, optimizedRows, 'Enderecos');
+
+  const elapsed = performance.now() - startTime;
+  console.log('[ADDRESS OPTIMIZER] Optimization complete', {
+    totalRows: rows.length,
+    processedCount,
+    alreadyCorrectCount,
+    unchangedCount,
+    outputFileName,
+    processingTimeMs: elapsed.toFixed(2),
+  });
 
   return { processedCount, outputFileName, blob };
 }

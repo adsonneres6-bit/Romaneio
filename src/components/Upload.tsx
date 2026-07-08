@@ -19,6 +19,12 @@ export function Upload({ onImport, onError, disabled = true, userId }: UploadPro
   const [fileKind, setFileKind] = useState<'xlsx' | 'pdf' | null>(null);
 
   const handleFile = async (file: File) => {
+    console.log('[UPLOAD] Starting file processing', {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+      fileType: file.type || 'unknown',
+    });
+
     // Always validate license on backend before processing
     if (!userId) {
       onError?.('Usuário não identificado. Faça login novamente.');
@@ -33,6 +39,9 @@ export function Upload({ onImport, onError, disabled = true, userId }: UploadPro
       const validation = await validateLicenseForImport(userId);
 
       if (!validation.valid) {
+        console.warn('[UPLOAD] License validation failed', {
+          message: validation.message,
+        });
         onError?.(validation.message || 'Sua licença está vencida. Renove para importar arquivos.');
         setValidating(false);
         setFileName(null);
@@ -40,6 +49,7 @@ export function Upload({ onImport, onError, disabled = true, userId }: UploadPro
       }
 
       // License is valid, proceed with import
+      console.log('[UPLOAD] License validated, starting import');
       setValidating(false);
       setLoading(true);
       const isPdf = file.name.toLowerCase().endsWith('.pdf');
@@ -49,13 +59,24 @@ export function Upload({ onImport, onError, disabled = true, userId }: UploadPro
         ? await importPdf(file)
         : await importXlsx(file);
 
+      console.log('[UPLOAD] Import result', {
+        rowsFound: rows.length,
+        headersCount: headers.length,
+        fileKind: isPdf ? 'pdf' : 'xlsx',
+      });
+
       if (rows.length === 0) {
+        console.error('[UPLOAD] IMPORT RETURNED ZERO ROWS - Check parser logs for details');
         onError?.('Nenhum pedido encontrado no arquivo.');
       } else {
+        console.log('[UPLOAD] Import successful, passing to callback');
         onImport(rows, headers);
       }
     } catch (err) {
-      console.error(err);
+      console.error('[UPLOAD] Import error', {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       const msg = err instanceof Error ? err.message : 'Erro ao importar arquivo.';
       onError?.(msg);
     } finally {

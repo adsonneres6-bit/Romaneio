@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Truck, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { login, confirmDeviceLogin, type LoginResult, type UserWithLicenseStatus } from '../services/authService';
 import { supabase } from '../lib/supabase';
 import { EmailInput } from './EmailInput';
+import { GlobalAnnouncementModal } from './GlobalAnnouncementModal';
+import {
+  getActiveAnnouncements,
+  confirmAnnouncement,
+  dismissAnnouncementLocally,
+  type GlobalAnnouncement,
+} from '../services/announcementService';
 
 const REMEMBERED_EMAIL_KEY = 'romaneio_remembered_email';
 const REMEMBERED_PASSWORD_KEY = 'romaneio_remembered_password';
@@ -23,6 +30,13 @@ export function LoginPage({ onSuccess, onRegister }: LoginPageProps) {
     userId: string;
   } | null>(null);
 
+  // Login announcement state
+  const [loginAnnouncement, setLoginAnnouncement] = useState<GlobalAnnouncement | null>(null);
+  const [checkingAnnouncements, setCheckingAnnouncements] = useState(true);
+
+  // Pending announcement confirmation after login
+  const pendingAnnouncementRef = useRef<string | null>(null);
+
   // Carrega e-mail e senha salvos quando "Permanecer conectado" estava marcado
   useEffect(() => {
     try {
@@ -40,6 +54,19 @@ export function LoginPage({ onSuccess, onRegister }: LoginPageProps) {
     } catch {
       // Ignora erros do localStorage
     }
+  }, []);
+
+  // Check for login announcements
+  useEffect(() => {
+    const checkLoginAnnouncements = async () => {
+      setCheckingAnnouncements(true);
+      const announcements = await getActiveAnnouncements('login');
+      if (announcements.length > 0) {
+        setLoginAnnouncement(announcements[0]);
+      }
+      setCheckingAnnouncements(false);
+    };
+    checkLoginAnnouncements();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,6 +92,11 @@ export function LoginPage({ onSuccess, onRegister }: LoginPageProps) {
       const result: LoginResult = await login(email, password, persist);
 
       if (result.ok && result.user) {
+        // Confirm any pending announcement after successful login
+        if (pendingAnnouncementRef.current) {
+          await confirmAnnouncement(result.user.id, pendingAnnouncementRef.current);
+          pendingAnnouncementRef.current = null;
+        }
         if (result.needsDeviceConfirmation) {
           setPendingDeviceLogin({ userId: result.user.id });
         } else {
@@ -267,6 +299,20 @@ export function LoginPage({ onSuccess, onRegister }: LoginPageProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Login Announcement Modal */}
+      {loginAnnouncement && (
+        <GlobalAnnouncementModal
+          announcement={loginAnnouncement}
+          onConfirm={async () => {
+            // Store the announcement ID to confirm after login
+            pendingAnnouncementRef.current = loginAnnouncement.id;
+            // Also dismiss locally so it doesn't show again before login
+            dismissAnnouncementLocally(loginAnnouncement.id);
+            setLoginAnnouncement(null);
+          }}
+        />
       )}
     </div>
   );
