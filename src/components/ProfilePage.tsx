@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Mail, Calendar, KeyRound, Eye, EyeOff, Check, QrCode, AlertTriangle, X, User as UserIcon, CreditCard, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Mail, Calendar, KeyRound, Eye, EyeOff, Check, QrCode, AlertTriangle, X, User as UserIcon, CreditCard, PlayCircle } from 'lucide-react';
 import { changePassword } from '../services/authService';
 import { getLicense, daysRemaining, isFreeTrialLicense, getLicenseStatus, formatDateBR } from '../services/licenseService';
 import { getMyReferralInfo } from '../services/referralService';
-import { getTutorialUrl, toEmbedUrl, getTrialDays, getApkCircuitUrl } from '../services/settingsService';
+import { getTutorialUrl, toEmbedUrl, getTrialDays } from '../services/settingsService';
 import type { UserWithLicenseStatus } from '../services/authService';
 import { PixPaymentPanel } from './PixPaymentPanel';
 
@@ -35,8 +35,6 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
 
 
 
-  // APK Circuit URL state
-  const [apkCircuitUrl, setApkCircuitUrlState] = useState('');
 
   // License state
   const [remaining, setRemaining] = useState(0);
@@ -66,7 +64,6 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
       setTutorialUrl(url);
       setTutorialLoaded(true);
     });
-    getApkCircuitUrl().then(setApkCircuitUrlState);
   }, []);
 
   const embedUrl = tutorialUrl ? toEmbedUrl(tutorialUrl) : '';
@@ -280,18 +277,6 @@ export function ProfilePage({ user, isAdmin, onBack, defaultTab = 'profile', isI
                 >
                   <KeyRound className="h-4 w-4" />
                   Alterar senha
-                </button>
-                <button
-                  onClick={() => {
-                    if (apkCircuitUrl) {
-                      window.location.href = apkCircuitUrl;
-                    }
-                  }}
-                  disabled={!apkCircuitUrl}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Circuit
                 </button>
                 {tutorialLoaded && tutorialUrl && (
                   <button

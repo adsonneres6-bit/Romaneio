@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Moon, Sun, PackageOpen, ArrowUp, Menu, X, History, Users, CreditCard, LogOut, UserCircle, AlertTriangle, PlayCircle, Home, Gift } from 'lucide-react';
+import { Moon, Sun, PackageOpen, ArrowUp, Menu, X, History, Users, CreditCard, LogOut, UserCircle, AlertTriangle, PlayCircle, Home, Gift, Download } from 'lucide-react';
 import type { RawRow, DeliveryGroup, CheckState } from './types';
 import {
   groupDeliveriesWithOptions,
@@ -7,6 +7,7 @@ import {
   type PotentialGroup,
 } from './services/groupingService';
 import { assignSequences } from './services/sequencingService';
+import { getApkCircuitUrl } from './services/settingsService';
 import { GroupingConfirmModal } from './components/GroupingConfirmModal';
 import {
   createCheckState,
@@ -125,6 +126,7 @@ function App() {
   const [showUsers, setShowUsers] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [apkCircuitUrl, setApkCircuitUrlState] = useState('');
   const [profileDefaultTab, setProfileDefaultTab] = useState<'profile' | 'payment'>('profile');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [activeFileName, setActiveFileName] = useState<string>('');
@@ -160,6 +162,7 @@ function App() {
   // Load trial days config for dynamic messages
   useEffect(() => {
     getTrialDays().then(setTrialDaysConfig);
+    getApkCircuitUrl().then(setApkCircuitUrlState);
   }, []);
 
   // Initialize session on mount
@@ -952,6 +955,20 @@ function App() {
                           </button>
                         </>
                       )}
+                      <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
+                      <button
+                        onClick={() => {
+                          if (apkCircuitUrl) {
+                            window.location.href = apkCircuitUrl;
+                          }
+                          setMenuOpen(false);
+                        }}
+                        disabled={!apkCircuitUrl}
+                        className="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                      >
+                        <Download className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                        Download Circuit
+                      </button>
                       <button
                         onClick={handleLogout}
                         className="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"

@@ -99,6 +99,7 @@ export interface Database {
           headers_data: Json;
           check_state_data: Json;
           created_at: string;
+          import_type: string | null;
         };
         Insert: {
           id?: string;
@@ -114,6 +115,7 @@ export interface Database {
           headers_data?: Json;
           check_state_data?: Json;
           created_at?: string;
+          import_type?: string | null;
         };
         Update: {
           id?: string;
@@ -129,6 +131,7 @@ export interface Database {
           headers_data?: Json;
           check_state_data?: Json;
           created_at?: string;
+          import_type?: string | null;
         };
       };
       payments: {

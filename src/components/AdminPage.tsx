@@ -18,6 +18,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Calendar,
+  Wrench,
 } from 'lucide-react';
 import {
   setShowLicenseToUsers,
@@ -50,12 +51,13 @@ import {
 import { getAllDevices, removeUserDevice, deactivateUserDevice, formatDateBR as formatDeviceDateBR, type DeviceRecord } from '../services/deviceService';
 import { AlertModal } from './AlertModal';
 import { ConfirmModal } from './ConfirmModal';
+import { MaintenancePage } from './MaintenancePage';
 
 interface AdminPageProps {
   onBack: () => void;
 }
 
-type Tab = 'settings' | 'devices' | 'announcements';
+type Tab = 'settings' | 'devices' | 'announcements' | 'maintenance';
 
 export function AdminPage({ onBack }: AdminPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('settings');
@@ -263,6 +265,17 @@ export function AdminPage({ onBack }: AdminPageProps) {
                   {announcements.filter(a => a.isActive).length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('maintenance')}
+              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'maintenance'
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Manutenção
             </button>
           </div>
         </div>
@@ -778,6 +791,10 @@ export function AdminPage({ onBack }: AdminPageProps) {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'maintenance' && (
+          <MaintenancePage onAlert={setAlertMessage} />
         )}
 
         {/* Announcements Tab */}
