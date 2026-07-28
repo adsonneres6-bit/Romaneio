@@ -157,11 +157,11 @@ function App() {
     const checkTutorialsAndWelcome = async () => {
       const [interfaceUrl, flexUrl, frotaUrl] = await Promise.all([
         getTutorialInterfaceUrl(),
-        Promise.resolve(''),
+        getTutorialFlexUrl(),
         getTutorialFrotaUrl(),
       ]);
 
-      const hasTutorials = !!(interfaceUrl.trim() || flexUrl.toString().trim() || frotaUrl.trim());
+      const hasTutorials = !!(interfaceUrl.trim() || flexUrl.trim() || frotaUrl.trim());
       if (!hasTutorials) return;
 
       const seenWelcome = await hasSeenWelcomeModal();
