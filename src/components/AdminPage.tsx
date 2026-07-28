@@ -3,10 +3,6 @@ import {
   Settings,
   ArrowLeft,
   Save,
-  Monitor,
-  RefreshCw,
-  Layers,
-  Gift,
   ChevronDown,
   ChevronUp,
   PlayCircle,
@@ -21,7 +17,6 @@ import {
   Wrench,
 } from 'lucide-react';
 import {
-  setShowLicenseToUsers,
   getTutorialInterfaceUrl,
   setTutorialInterfaceUrl,
   getTutorialFlexUrl,
@@ -30,14 +25,6 @@ import {
   setTutorialFrotaUrl,
   getApkCircuitUrl,
   setApkCircuitUrl,
-  getMaxDevicesPerUser,
-  setMaxDevicesPerUser,
-  getTrialDays,
-  setTrialDays,
-  getReferralBonusDays,
-  setReferralBonusDays,
-  getReferralRequirePayment,
-  setReferralRequirePayment,
   validateYouTubeUrl,
 } from '../services/settingsService';
 import {
@@ -48,7 +35,6 @@ import {
   type GlobalAnnouncement,
   type DisplayLocation,
 } from '../services/announcementService';
-import { getAllDevices, removeUserDevice, deactivateUserDevice, formatDateBR as formatDeviceDateBR, type DeviceRecord } from '../services/deviceService';
 import { AlertModal } from './AlertModal';
 import { ConfirmModal } from './ConfirmModal';
 import { MaintenancePage } from './MaintenancePage';
@@ -57,15 +43,12 @@ interface AdminPageProps {
   onBack: () => void;
 }
 
-type Tab = 'settings' | 'devices' | 'announcements' | 'maintenance';
+type Tab = 'settings' | 'announcements' | 'maintenance';
 
 export function AdminPage({ onBack }: AdminPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('settings');
-  const [showLicenseToUsers, setShowLicenseToUsersState] = useState(true);
   const [alertMessage, setAlertMessage] = useState('');
 
-
-  // Tutorial URLs state
   const [tutorialsExpanded, setTutorialsExpanded] = useState(false);
   const [tutorialInterfaceUrl, setTutorialInterfaceUrlState] = useState('');
   const [tutorialInterfaceInput, setTutorialInterfaceInput] = useState('');
@@ -76,31 +59,11 @@ export function AdminPage({ onBack }: AdminPageProps) {
   const [tutorialsSaving, setTutorialsSaving] = useState(false);
   const [tutorialsSaved, setTutorialsSaved] = useState(false);
 
-  // APK URL state
   const [apkCircuitUrl, setApkCircuitUrlState] = useState('');
   const [apkCircuitInput, setApkCircuitInput] = useState('');
   const [apkSaving, setApkSaving] = useState(false);
   const [apkSaved, setApkSaved] = useState(false);
 
-
-  const [maxDevices, setMaxDevicesState] = useState(2);
-  const [maxDevicesInput, setMaxDevicesInput] = useState('2');
-
-  const [trialDays, setTrialDaysState] = useState(30);
-  const [trialDaysInput, setTrialDaysInput] = useState('30');
-
-  // Referral settings
-  const [referralBonusDays, setReferralBonusDaysState] = useState(7);
-  const [referralBonusDaysInput, setReferralBonusDaysInput] = useState('7');
-  const [referralRequirePayment, setReferralRequirePaymentState] = useState(false);
-
-  // Devices tab state
-  const [allDevices, setAllDevices] = useState<DeviceRecord[]>([]);
-  const [loadingDevices, setLoadingDevices] = useState(false);
-  const [deviceToRemove, setDeviceToRemove] = useState<DeviceRecord | null>(null);
-  const [deviceToDeactivate, setDeviceToDeactivate] = useState<DeviceRecord | null>(null);
-
-  // Announcements tab state
   const [announcements, setAnnouncements] = useState<GlobalAnnouncement[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [showAnnouncementEditor, setShowAnnouncementEditor] = useState(false);
@@ -133,36 +96,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
       setApkCircuitUrlState(url);
       setApkCircuitInput(url);
     });
-    getMaxDevicesPerUser().then((max) => {
-      setMaxDevicesState(max);
-      setMaxDevicesInput(String(max));
-    });
-    getTrialDays().then((days) => {
-      setTrialDaysState(days);
-      setTrialDaysInput(String(days));
-    });
-    getReferralBonusDays().then((days) => {
-      setReferralBonusDaysState(days);
-      setReferralBonusDaysInput(String(days));
-    });
-    getReferralRequirePayment().then(setReferralRequirePaymentState);
   }, []);
-
-  const loadDevices = useCallback(async () => {
-    setLoadingDevices(true);
-    const devices = await getAllDevices();
-    setAllDevices(devices);
-    setLoadingDevices(false);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'devices') {
-      loadDevices();
-    }
-    if (activeTab === 'announcements') {
-      loadAnnouncements();
-    }
-  }, [activeTab, loadDevices]);
 
   const loadAnnouncements = useCallback(async () => {
     setLoadingAnnouncements(true);
@@ -171,34 +105,11 @@ export function AdminPage({ onBack }: AdminPageProps) {
     setLoadingAnnouncements(false);
   }, []);
 
-  const handleDeactivateDevice = useCallback(async () => {
-    if (!deviceToDeactivate) return;
-    const result = await deactivateUserDevice(deviceToDeactivate.id);
-    if (result.success) {
-      await loadDevices();
-    } else {
-      setAlertMessage(result.error || 'Erro ao desativar dispositivo');
+  useEffect(() => {
+    if (activeTab === 'announcements') {
+      loadAnnouncements();
     }
-    setDeviceToDeactivate(null);
-  }, [deviceToDeactivate, loadDevices]);
-
-  const handleRemoveDevice = useCallback(async () => {
-    if (!deviceToRemove) return;
-    const result = await removeUserDevice(deviceToRemove.id);
-    if (result.success) {
-      await loadDevices();
-    } else {
-      setAlertMessage(result.error || 'Erro ao excluir dispositivo');
-    }
-    setDeviceToRemove(null);
-  }, [deviceToRemove, loadDevices]);
-
-  const groupedByUser = allDevices.reduce<Record<string, DeviceRecord[]>>((acc, device) => {
-    const key = device.userId || 'unknown';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(device);
-    return acc;
-  }, {});
+  }, [activeTab, loadAnnouncements]);
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900">
@@ -220,7 +131,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mx-auto max-w-4xl border-t border-slate-200 px-4 dark:border-slate-800">
           <div className="flex gap-1">
             <button
@@ -231,24 +141,8 @@ export function AdminPage({ onBack }: AdminPageProps) {
                   : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
               }`}
             >
-              <Layers className="h-4 w-4" />
+              <PlayCircle className="h-4 w-4" />
               Configurações
-            </button>
-            <button
-              onClick={() => setActiveTab('devices')}
-              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'devices'
-                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              <Monitor className="h-4 w-4" />
-              Dispositivos
-              {allDevices.length > 0 && (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {allDevices.filter(d => d.isActive).length}
-                </span>
-              )}
             </button>
             <button
               onClick={() => setActiveTab('announcements')}
@@ -284,40 +178,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
       <main className="mx-auto max-w-4xl px-4 py-6">
         {activeTab === 'settings' && (
           <>
-            {/* Display settings */}
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-              <label className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">
-                    Exibir informações da licença para os usuários
-                  </span>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Quando desativado, os usuários não verão a data de vencimento nem os dias restantes na tela de Perfil.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={showLicenseToUsers}
-                  onClick={async () => {
-                    const next = !showLicenseToUsers;
-                    await setShowLicenseToUsers(next);
-                    setShowLicenseToUsersState(next);
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    showLicenseToUsers ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      showLicenseToUsers ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </label>
-            </div>
-
-            {/* Tutoriais Section - Expandable */}
             <div className="mb-6 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
               <button
                 onClick={() => setTutorialsExpanded(!tutorialsExpanded)}
@@ -338,7 +198,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
 
               {tutorialsExpanded && (
                 <div className="space-y-4 border-t border-slate-100 p-4 dark:border-slate-700">
-                  {/* Tutorial Interface */}
                   <div>
                     <div className="mb-1.5">
                       <span className="text-sm font-medium text-slate-900 dark:text-white">
@@ -357,18 +216,14 @@ export function AdminPage({ onBack }: AdminPageProps) {
                     />
                   </div>
 
-                  {/* Tutorial Flex */}
                   <div className="border-t border-slate-100 pt-4 dark:border-slate-700">
-                    <div className="mb-1.5 flex items-center gap-2">
+                    <div className="mb-1.5">
                       <span className="text-sm font-medium text-slate-900 dark:text-white">
                         Tutorial Flex
                       </span>
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                        Obrigatório
-                      </span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      URL do vídeo tutorial obrigatório do sistema Flex. O usuário deverá assistir até o final para desbloquear o sistema.
+                      URL do vídeo tutorial do sistema Flex.
                     </p>
                     <input
                       type="url"
@@ -379,7 +234,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
                     />
                   </div>
 
-                  {/* Tutorial Frota */}
                   <div className="border-t border-slate-100 pt-4 dark:border-slate-700">
                     <div className="mb-1.5">
                       <span className="text-sm font-medium text-slate-900 dark:text-white">
@@ -398,13 +252,11 @@ export function AdminPage({ onBack }: AdminPageProps) {
                     />
                   </div>
 
-                  {/* Single Save Button */}
                   <div className="border-t border-slate-100 pt-4 dark:border-slate-700">
                     <button
                       onClick={async () => {
                         setTutorialsSaving(true);
                         try {
-                          // Validate URLs first
                           const urls = [
                             { name: 'Interface', url: tutorialInterfaceInput.trim() },
                             { name: 'Flex', url: tutorialFlexInput.trim() },
@@ -422,19 +274,16 @@ export function AdminPage({ onBack }: AdminPageProps) {
                             }
                           }
 
-                          // Save all tutorials - now returns success/error
                           const results = await Promise.all([
                             setTutorialInterfaceUrl(tutorialInterfaceInput.trim()),
                             setTutorialFlexUrl(tutorialFlexInput.trim()),
                             setTutorialFrotaUrl(tutorialFrotaInput.trim()),
                           ]);
 
-                          // Check for errors
                           const errors = results.filter(r => !r.success);
                           if (errors.length > 0) {
                             setAlertMessage('Erro ao salvar tutoriais: ' + errors.map(e => e.error).join(', '));
                           } else {
-                            // Update local state only after successful save
                             setTutorialInterfaceUrlState(tutorialInterfaceInput.trim());
                             setTutorialFlexUrlState(tutorialFlexInput.trim());
                             setTutorialFrotaUrlState(tutorialFrotaInput.trim());
@@ -442,7 +291,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                             setAlertMessage('Tutoriais salvos com sucesso!');
                             setTimeout(() => setTutorialsSaved(false), 2000);
                           }
-                        } catch (err) {
+                        } catch {
                           setAlertMessage('Erro ao salvar tutoriais');
                         } finally {
                           setTutorialsSaving(false);
@@ -454,24 +303,20 @@ export function AdminPage({ onBack }: AdminPageProps) {
                       <Save className="h-5 w-5" />
                       {tutorialsSaving ? 'Salvando...' : tutorialsSaved ? 'Salvo!' : 'Salvar'}
                     </button>
-                    <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-                      Salva todas as URLs configuradas acima
-                    </p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* APK Circuit URL */}
             <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
               <div className="mb-2 flex items-center gap-2">
                 <Download className="h-5 w-5 text-emerald-500" />
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  URL do APK Circuito
+                  URL do APK Circuit
                 </span>
               </div>
               <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-                URL de download do aplicativo Circuito (APK). Esta URL será utilizada pelo botão Download Circuito na tela de Perfil dos usuários.
+                URL de download do aplicativo Circuit (APK). Esta URL será utilizada pelo botão Download Circuit no menu.
               </p>
               <div className="flex gap-2">
                 <input
@@ -498,306 +343,13 @@ export function AdminPage({ onBack }: AdminPageProps) {
                 </button>
               </div>
             </div>
-
-            {/* Max devices setting */}
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-              <div className="mb-2">
-                <span className="text-sm font-medium text-slate-900 dark:text-white">
-                  Máximo de dispositivos por usuário
-                </span>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Limite de dispositivos que cada usuário pode utilizar para acessar a conta.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={maxDevicesInput}
-                  onChange={(e) => setMaxDevicesInput(e.target.value)}
-                  className="w-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                />
-                <button
-                  onClick={async () => {
-                    const value = parseInt(maxDevicesInput, 10);
-                    if (isNaN(value) || value < 1) {
-                      setAlertMessage('Valor inválido');
-                      return;
-                    }
-                    await setMaxDevicesPerUser(value);
-                    setMaxDevicesState(value);
-                    setAlertMessage('Configuração salva com sucesso!');
-                  }}
-                  className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-                >
-                  <Save className="h-4 w-4" />
-                  Salvar
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Valor atual: {maxDevices} dispositivo(s) por usuário
-              </p>
-            </div>
-
-            {/* Trial days setting */}
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-              <div className="mb-2">
-                <span className="text-sm font-medium text-slate-900 dark:text-white">
-                  Dias gratuitos de teste
-                </span>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Quantidade de dias gratuitos para novos usuários. Esta alteração afeta apenas novos cadastros.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={trialDaysInput}
-                  onChange={(e) => setTrialDaysInput(e.target.value)}
-                  className="w-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                />
-                <button
-                  onClick={async () => {
-                    const value = parseInt(trialDaysInput, 10);
-                    if (isNaN(value) || value < 1) {
-                      setAlertMessage('Valor inválido');
-                      return;
-                    }
-                    await setTrialDays(value);
-                    setTrialDaysState(value);
-                    setAlertMessage('Configuração salva com sucesso!');
-                  }}
-                  className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-                >
-                  <Save className="h-4 w-4" />
-                  Salvar
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Valor atual: {trialDays} dias de teste para novos usuários
-              </p>
-            </div>
-
-            {/* Programa de Indicação */}
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-              <div className="mb-4 flex items-center gap-2">
-                <Gift className="h-5 w-5 text-emerald-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Programa de Indicação
-                </h3>
-              </div>
-
-              {/* Bonus days */}
-              <div className="mb-4">
-                <label className="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white">
-                  Dias de bônus por indicação
-                </label>
-                <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-                  Quantidade de dias que o indicador recebe a cada indicação bem-sucedida.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={referralBonusDaysInput}
-                    onChange={(e) => setReferralBonusDaysInput(e.target.value)}
-                    className="w-20 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                  />
-                  <button
-                    onClick={async () => {
-                      const value = parseInt(referralBonusDaysInput, 10);
-                      if (isNaN(value) || value < 1) {
-                        setAlertMessage('Valor inválido');
-                        return;
-                      }
-                      await setReferralBonusDays(value);
-                      setReferralBonusDaysState(value);
-                      setAlertMessage('Configuração salva com sucesso!');
-                    }}
-                    className="flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-                  >
-                    <Save className="h-4 w-4" />
-                    Salvar
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  Valor atual: {referralBonusDays} dias por indicação
-                </p>
-              </div>
-
-              {/* Require payment switch */}
-              <div className="border-t border-slate-100 pt-4 dark:border-slate-700">
-                <label className="flex items-center justify-between">
-                  <div className="pr-4">
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">
-                      Exigir pagamento para validar indicação
-                    </span>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      {referralRequirePayment
-                        ? 'Ativado — O bônus será concedido apenas quando o usuário indicado realizar sua primeira compra.'
-                        : 'Desativado — O bônus será concedido imediatamente após o cadastro.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={referralRequirePayment}
-                    onClick={async () => {
-                      const next = !referralRequirePayment;
-                      await setReferralRequirePayment(next);
-                      setReferralRequirePaymentState(next);
-                    }}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      referralRequirePayment ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        referralRequirePayment ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-            </div>
           </>
-        )}
-
-        {activeTab === 'devices' && (
-          <div>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                  Dispositivos Autorizados
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Todos os dispositivos registrados no sistema, agrupados por usuário.
-                </p>
-              </div>
-              <button
-                onClick={loadDevices}
-                disabled={loadingDevices}
-                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
-                <RefreshCw className={`h-4 w-4 ${loadingDevices ? 'animate-spin' : ''}`} />
-                Atualizar
-              </button>
-            </div>
-
-            {loadingDevices ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
-              </div>
-            ) : Object.keys(groupedByUser).length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
-                <Monitor className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  Nenhum dispositivo registrado
-                </p>
-                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                  Os dispositivos serão registrados automaticamente quando os usuários fizerem login.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(groupedByUser).map(([userId, devices]) => {
-                  const firstDevice = devices[0];
-                  const userName = firstDevice.userName || 'Usuário';
-                  const userEmail = firstDevice.userEmail || '';
-                  const activeCount = devices.filter(d => d.isActive).length;
-
-                  return (
-                    <div
-                      key={userId}
-                      className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      {/* User header */}
-                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {userName}
-                          </p>
-                          {userEmail && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {userEmail}
-                            </p>
-                          )}
-                        </div>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          activeCount > 0
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
-                            : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                        }`}>
-                          {activeCount} ativo{activeCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-
-                      {/* Device list */}
-                      <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {devices.map((device) => (
-                          <div key={device.id} className="flex items-start justify-between px-4 py-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                  {device.browser || 'Navegador'} {device.browserVersion}
-                                </span>
-                                {device.isActive ? (
-                                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
-                                    Ativo
-                                  </span>
-                                ) : (
-                                  <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/40 dark:text-red-400">
-                                    Inativo
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {device.os} {device.osVersion}
-                                {device.screenResolution && <> · {device.screenResolution}</>}
-                                {device.timezone && <> · {device.timezone}</>}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-slate-400">
-                                Primeiro acesso: {formatDeviceDateBR(device.firstAccessAt)} · Último: {formatDeviceDateBR(device.lastAccessAt)}
-                              </p>
-                            </div>
-                            <div className="ml-2 flex items-center gap-1">
-                              {device.isActive && (
-                                <button
-                                  onClick={() => setDeviceToDeactivate(device)}
-                                  className="rounded-lg px-2 py-1 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/30"
-                                  title="Desativar dispositivo"
-                                >
-                                  Desativar
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setDeviceToRemove(device)}
-                                className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                                title="Excluir dispositivo permanentemente"
-                              >
-                                Excluir
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         )}
 
         {activeTab === 'maintenance' && (
           <MaintenancePage onAlert={setAlertMessage} />
         )}
 
-        {/* Announcements Tab */}
         {activeTab === 'announcements' && (
           <div>
             <div className="mb-4 flex items-center justify-between">
@@ -815,7 +367,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                   disabled={loadingAnnouncements}
                   className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 >
-                  <RefreshCw className={`h-4 w-4 ${loadingAnnouncements ? 'animate-spin' : ''}`} />
+                  <Plus className="h-4 w-4" />
                   Atualizar
                 </button>
                 <button
@@ -834,7 +386,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                   }}
                   className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Megaphone className="h-4 w-4" />
                   Novo Comunicado
                 </button>
               </div>
@@ -849,9 +401,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
                 <Megaphone className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   Nenhum comunicado criado
-                </p>
-                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                  Crie comunicados para enviar mensagens a todos os usuários do sistema.
                 </p>
               </div>
             ) : (
@@ -885,9 +434,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
                           {announcement.message}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-700">
-                            {announcement.displayLocation === 'login' ? 'Tela de Login' : 'Após Login'}
-                          </span>
                           {announcement.showOncePerUser && (
                             <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                               Uma vez por usuário
@@ -966,7 +512,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
               </div>
             )}
 
-            {/* Announcement Editor Modal */}
             {showAnnouncementEditor && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
                 <div className="animate-slide-up w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
@@ -1019,8 +564,8 @@ export function AdminPage({ onBack }: AdminPageProps) {
                         }
                         className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                       >
-                        <option value="login">Tela de Login (antes de entrar)</option>
-                        <option value="after_login">Após Login (dentro do sistema)</option>
+                        <option value="after_login">Ao abrir o sistema</option>
+                        <option value="login">Tela inicial</option>
                       </select>
                     </div>
 
@@ -1075,9 +620,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                         >
                           <span
                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              announcementForm.requireConfirmation
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
+                              announcementForm.requireConfirmation ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
                         </button>
@@ -1175,28 +718,6 @@ export function AdminPage({ onBack }: AdminPageProps) {
 
       {alertMessage && (
         <AlertModal message={alertMessage} onClose={() => setAlertMessage('')} />
-      )}
-
-      {deviceToDeactivate && (
-        <ConfirmModal
-          title="Desativar dispositivo?"
-          message={`Desativar o dispositivo "${deviceToDeactivate.browser || 'Navegador'}" de ${deviceToDeactivate.userName || 'este usuário'}? O acesso ficará bloqueado; a vaga pode ser reativada depois.`}
-          confirmLabel="Desativar"
-          confirmVariant="danger"
-          onConfirm={handleDeactivateDevice}
-          onCancel={() => setDeviceToDeactivate(null)}
-        />
-      )}
-
-      {deviceToRemove && (
-        <ConfirmModal
-          title="Excluir dispositivo?"
-          message={`Excluir permanentemente o dispositivo "${deviceToRemove.browser || 'Navegador'}" de ${deviceToRemove.userName || 'este usuário'}? Uma vaga será liberada para um novo dispositivo.`}
-          confirmLabel="Excluir"
-          confirmVariant="danger"
-          onConfirm={handleRemoveDevice}
-          onCancel={() => setDeviceToRemove(null)}
-        />
       )}
 
       {announcementToDelete && (

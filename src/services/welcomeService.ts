@@ -1,71 +1,36 @@
-import { supabase } from '../lib/supabase';
+const WELCOME_KEY = 'circuit_welcome_modal_shown';
+const INFO_KEY = 'circuit_info_modal_shown';
 
-/**
- * Check if user has seen the welcome modal
- */
-export async function hasSeenWelcomeModal(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('welcome_modal_shown')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error checking welcome modal status:', error);
+export async function hasSeenWelcomeModal(_userId?: string): Promise<boolean> {
+  try {
+    return localStorage.getItem(WELCOME_KEY) === 'true';
+  } catch {
     return false;
   }
-
-  return data?.welcome_modal_shown ?? false;
 }
 
-/**
- * Mark that user has seen the welcome modal
- */
-export async function markWelcomeModalSeen(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ welcome_modal_shown: true })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error marking welcome modal as seen:', error);
-    return false;
+export async function markWelcomeModalSeen(_userId?: string): Promise<boolean> {
+  try {
+    localStorage.setItem(WELCOME_KEY, 'true');
+  } catch {
+    // Ignore
   }
-
   return true;
 }
 
-/**
- * Check if user has seen the info modal
- */
-export async function hasSeenInfoModal(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('info_modal_shown')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error checking info modal status:', error);
+export async function hasSeenInfoModal(_userId?: string): Promise<boolean> {
+  try {
+    return localStorage.getItem(INFO_KEY) === 'true';
+  } catch {
     return false;
   }
-
-  return data?.info_modal_shown ?? false;
 }
 
-/**
- * Mark that user has seen the info modal
- */
-export async function markInfoModalSeen(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ info_modal_shown: true })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error marking info modal as seen:', error);
-    return false;
+export async function markInfoModalSeen(_userId?: string): Promise<boolean> {
+  try {
+    localStorage.setItem(INFO_KEY, 'true');
+  } catch {
+    // Ignore
   }
-
   return true;
 }

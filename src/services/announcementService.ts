@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
+import { getInstallationId } from './installationService';
 
-export type DisplayLocation = 'login' | 'after_login';
+export type DisplayLocation = 'after_login' | 'login';
 
 export interface GlobalAnnouncement {
   id: string;
@@ -75,9 +76,10 @@ export async function getAllAnnouncements(): Promise<GlobalAnnouncement[]> {
  */
 export async function getActiveAnnouncements(
   location: DisplayLocation,
-  userId?: string
+  _userId?: string
 ): Promise<GlobalAnnouncement[]> {
   const now = new Date().toISOString();
+  const installationId = getInstallationId();
 
   let query = supabase
     .from('global_announcements')
@@ -96,36 +98,20 @@ export async function getActiveAnnouncements(
 
   const announcements = (data || []).map(mapAnnouncement);
 
-  // Filter based on user confirmation status
   if (announcements.length > 0) {
-    // For login announcements without user (pre-login), use localStorage
-    if (location === 'login' && !userId) {
-      const dismissedIds = getDismissedAnnouncementIds();
-      return announcements.filter(a => {
-        if (a.showOncePerUser && dismissedIds.has(a.id)) {
-          return false;
-        }
-        return true;
-      });
-    }
+    const { data: confirmations } = await supabase
+      .from('announcement_confirmations')
+      .select('announcement_id')
+      .eq('user_id', installationId);
 
-    // For logged-in users, check database confirmations
-    if (userId) {
-      const { data: confirmations } = await supabase
-        .from('announcement_confirmations')
-        .select('announcement_id')
-        .eq('user_id', userId);
+    const confirmedIds = new Set((confirmations || []).map(c => c.announcement_id));
 
-      const confirmedIds = new Set((confirmations || []).map(c => c.announcement_id));
-
-      return announcements.filter(a => {
-        // If show_once is enabled and user already confirmed, don't show
-        if (a.showOncePerUser && confirmedIds.has(a.id)) {
-          return false;
-        }
-        return true;
-      });
-    }
+    return announcements.filter(a => {
+      if (a.showOncePerUser && confirmedIds.has(a.id)) {
+        return false;
+      }
+      return true;
+    });
   }
 
   return announcements;
@@ -211,19 +197,17 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
 /**
  * Confirm that a user has read an announcement
  */
-export async function confirmAnnouncement(userId: string, announcementId: string): Promise<boolean> {
+export async function confirmAnnouncement(_userId: string, announcementId: string): Promise<boolean> {
+  const installationId = getInstallationId();
   const { error } = await supabase
     .from('announcement_confirmations')
     .insert({
-      user_id: userId,
+      user_id: installationId,
       announcement_id: announcementId,
     });
 
   if (error) {
-    // Ignore duplicate key error (already confirmed)
-    if (error.code === '23505') {
-      return true;
-    }
+    if (error.code === '23505') return true;
     console.error('Error confirming announcement:', error);
     return false;
   }
@@ -235,13 +219,14 @@ export async function confirmAnnouncement(userId: string, announcementId: string
  * Check if a user has confirmed a specific announcement
  */
 export async function hasUserConfirmedAnnouncement(
-  userId: string,
+  _userId: string,
   announcementId: string
 ): Promise<boolean> {
+  const installationId = getInstallationId();
   const { data, error } = await supabase
     .from('announcement_confirmations')
     .select('id')
-    .eq('user_id', userId)
+    .eq('user_id', installationId)
     .eq('announcement_id', announcementId)
     .maybeSingle();
 

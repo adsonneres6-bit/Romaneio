@@ -1,82 +1,46 @@
-import { supabase } from '../lib/supabase';
+const COMPLETED_KEY = 'circuit_completed_tutorials';
 
 export type TutorialType = 'flex' | 'interface' | 'frota';
 
-export interface TutorialCompletion {
-  id: string;
-  userId: string;
-  tutorialType: TutorialType;
-  completedAt: string;
+function getCompletedSet(): Set<string> {
+  try {
+    const stored = localStorage.getItem(COMPLETED_KEY);
+    if (stored) return new Set(JSON.parse(stored));
+  } catch {
+    // Ignore
+  }
+  return new Set();
 }
 
-/**
- * Mark a tutorial as completed for a user
- */
+function saveCompletedSet(set: Set<string>): void {
+  try {
+    localStorage.setItem(COMPLETED_KEY, JSON.stringify([...set]));
+  } catch {
+    // Ignore
+  }
+}
+
 export async function completeTutorial(
-  userId: string,
+  _userId: string,
   tutorialType: TutorialType
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from('user_tutorial_completions')
-    .upsert({
-      user_id: userId,
-      tutorial_type: tutorialType,
-    });
-
-  if (error) {
-    console.error('Error completing tutorial:', error);
-    return false;
-  }
-
+  const set = getCompletedSet();
+  set.add(tutorialType);
+  saveCompletedSet(set);
   return true;
 }
 
-/**
- * Check if a user has completed a specific tutorial
- */
 export async function hasCompletedTutorial(
-  userId: string,
+  _userId: string,
   tutorialType: TutorialType
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('user_tutorial_completions')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('tutorial_type', tutorialType)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error checking tutorial completion:', error);
-    return false;
-  }
-
-  return !!data;
+  return getCompletedSet().has(tutorialType);
 }
 
-/**
- * Get all completed tutorials for a user
- */
-export async function getCompletedTutorials(
-  userId: string
-): Promise<TutorialType[]> {
-  const { data, error } = await supabase
-    .from('user_tutorial_completions')
-    .select('tutorial_type')
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error('Error fetching completed tutorials:', error);
-    return [];
-  }
-
-  return (data || []).map(d => d.tutorial_type as TutorialType);
+export async function getCompletedTutorials(_userId: string): Promise<TutorialType[]> {
+  return [...getCompletedSet()] as TutorialType[];
 }
 
-/**
- * Check if the mandatory Flex tutorial has been completed
- */
-export async function hasCompletedFlexTutorial(
-  userId: string
-): Promise<boolean> {
+export async function hasCompletedFlexTutorial(userId: string): Promise<boolean> {
   return hasCompletedTutorial(userId, 'flex');
 }

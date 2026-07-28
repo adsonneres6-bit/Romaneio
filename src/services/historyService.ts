@@ -1,84 +1,93 @@
-import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
+import { getInstallationId } from './installationService';
 import type { RawRow, DeliveryGroup, CheckState } from '../types';
-
-function countCheckedOrders(checkStateData: unknown): number {
-  if (!checkStateData || typeof checkStateData !== 'object') return 0;
-  const checked = (checkStateData as CheckState).checked;
-  if (!checked || typeof checked !== 'object') return 0;
-  return Object.values(checked).filter(Boolean).length;
-}
-
-export type ImportType = 'flex' | 'frota';
 
 export interface HistoryEntry {
   id: string;
-  user_id: string;
+  fileName: string;
   date: string;
-  importTime: string;
-  exportTime: string | null;
   totalOrders: number;
   totalGroups: number;
-  checkedGroups: number;
   checkedOrders: number;
-  fileName: string;
-  importType: ImportType;
+  importTime: string;
+  exportTime: string | null;
   rows: RawRow[];
   groups: DeliveryGroup[];
   headers: string[];
   checkState: CheckState;
+  importType?: string;
 }
 
-function todayBR(): string {
-  return new Date().toLocaleDateString('pt-BR');
+export interface FrotaHistoryEntry {
+  id: string;
+  fileName: string;
+  totalRows: number;
+  outputRows: number;
+  duplicatesRemoved: number;
+  headers: string[];
+  rows: RawRow[];
+  importTime: string;
 }
 
-function nowTime(): string {
-  return new Date().toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function mapHistoryEntry(d: Record<string, unknown>): HistoryEntry {
+  const importTime = d.import_time as string;
+  const date = importTime ? new Date(importTime).toLocaleDateString('pt-BR') : '';
+  return {
+    id: d.id as string,
+    fileName: d.file_name as string,
+    date,
+    totalOrders: d.total_orders as number,
+    totalGroups: d.total_groups as number,
+    checkedOrders: d.checked_groups as number,
+    importTime: importTime ? new Date(importTime).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+    exportTime: d.export_time as string | null,
+    rows: d.rows_data as RawRow[],
+    groups: d.groups_data as DeliveryGroup[],
+    headers: d.headers_data as string[],
+    checkState: d.check_state_data as CheckState,
+    importType: d.import_type as string | undefined,
+  };
 }
 
 export async function getHistory(): Promise<HistoryEntry[]> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) return [];
-
+  const installationId = getInstallationId();
   const { data, error } = await supabase
     .from('import_history')
     .select('*')
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
+    .eq('user_id', installationId)
+    .order('created_at', { ascending: false });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error('Error fetching import history:', error);
+    return [];
+  }
 
-  return data.map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    date: new Date(item.import_time).toLocaleDateString('pt-BR'),
-    importTime: new Date(item.import_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    exportTime: item.export_time
-      ? new Date(item.export_time).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null,
-    totalOrders: item.total_orders,
-    totalGroups: item.total_groups,
-    checkedGroups: item.checked_groups,
-    checkedOrders: countCheckedOrders(item.check_state_data),
-    fileName: item.file_name,
-    importType: (item.import_type as ImportType) || 'flex',
-    rows: item.rows_data as RawRow[],
-    groups: item.groups_data as DeliveryGroup[],
-    headers: item.headers_data as string[],
-    checkState: item.check_state_data as CheckState,
+  return (data || []).map(mapHistoryEntry);
+}
+
+export async function getFrotaImportHistory(): Promise<FrotaHistoryEntry[]> {
+  const installationId = getInstallationId();
+  const { data, error } = await supabase
+    .from('import_history')
+    .select('*')
+    .eq('user_id', installationId)
+    .eq('import_type', 'frota')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching frota import history:', error);
+    return [];
+  }
+
+  return (data || []).map((d: Record<string, unknown>) => ({
+    id: d.id as string,
+    fileName: d.file_name as string,
+    totalRows: d.total_orders as number,
+    outputRows: d.total_groups as number,
+    duplicatesRemoved: d.checked_groups as number,
+    headers: d.headers_data as string[],
+    rows: d.rows_data as RawRow[],
+    importTime: d.import_time as string,
   }));
 }
 
@@ -88,53 +97,35 @@ export async function addImportEntry(
   headers: string[],
   fileName: string,
   checkState: CheckState
-): Promise<HistoryEntry> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-
-  const insertData = {
-    user_id: session.user.id,
-    file_name: fileName,
-    total_orders: rows.length,
-    total_groups: groups.length,
-    checked_groups: 0,
-    import_type: 'flex',
-    rows_data: rows,
-    groups_data: groups,
-    headers_data: headers,
-    check_state_data: checkState,
-  };
+): Promise<HistoryEntry | null> {
+  const installationId = getInstallationId();
+  const totalOrders = rows.length;
+  const totalGroups = groups.length;
+  const checkedGroups = Object.values(checkState.checked).filter(Boolean).length;
 
   const { data, error } = await supabase
     .from('import_history')
-    .insert(insertData)
+    .insert({
+      user_id: installationId,
+      file_name: fileName,
+      total_orders: totalOrders,
+      total_groups: totalGroups,
+      checked_groups: checkedGroups,
+      rows_data: rows,
+      groups_data: groups,
+      headers_data: headers,
+      check_state_data: checkState,
+      import_type: 'flex',
+    })
     .select()
-    .maybeSingle();
+    .single();
 
   if (error) {
-    console.error('Error inserting import history:', error);
-    throw error;
+    console.error('Error adding import entry:', error);
+    return null;
   }
-  if (!data) throw new Error('Failed to create history entry - no data returned');
 
-  return {
-    id: data.id,
-    user_id: data.user_id,
-    date: todayBR(),
-    importTime: nowTime(),
-    exportTime: null,
-    totalOrders: data.total_orders,
-    totalGroups: data.total_groups,
-    checkedGroups: data.checked_groups,
-    fileName: data.file_name,
-    importType: 'flex',
-    rows: data.rows_data as RawRow[],
-    groups: data.groups_data as DeliveryGroup[],
-    headers: data.headers_data as string[],
-    checkState: data.check_state_data as CheckState,
-  };
+  return mapHistoryEntry(data);
 }
 
 export async function addFrotaImportEntry(
@@ -143,54 +134,38 @@ export async function addFrotaImportEntry(
   outputRows: number,
   duplicatesRemoved: number,
   headers: string[],
-  rows: string[][],
-): Promise<HistoryEntry> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-
-  const insertData = {
-    user_id: session.user.id,
-    file_name: fileName,
-    total_orders: totalRows,
-    total_groups: outputRows,
-    checked_groups: duplicatesRemoved,
-    import_type: 'frota',
-    rows_data: rows,
-    groups_data: [],
-    headers_data: headers,
-    check_state_data: { checked: {}, spxToGroup: {} },
-  };
-
+  rows: RawRow[]
+): Promise<FrotaHistoryEntry | null> {
+  const installationId = getInstallationId();
   const { data, error } = await supabase
     .from('import_history')
-    .insert(insertData)
+    .insert({
+      user_id: installationId,
+      file_name: fileName,
+      total_orders: totalRows,
+      total_groups: outputRows,
+      checked_groups: duplicatesRemoved,
+      headers_data: headers,
+      rows_data: rows,
+      import_type: 'frota',
+    })
     .select()
-    .maybeSingle();
+    .single();
 
   if (error) {
-    console.error('Error inserting frota import history:', error);
-    throw error;
+    console.error('Error adding frota import entry:', error);
+    return null;
   }
-  if (!data) throw new Error('Failed to create history entry - no data returned');
 
   return {
     id: data.id,
-    user_id: data.user_id,
-    date: todayBR(),
-    importTime: nowTime(),
-    exportTime: null,
-    totalOrders: data.total_orders,
-    totalGroups: data.total_groups,
-    checkedGroups: data.checked_groups,
-    checkedOrders: 0,
     fileName: data.file_name,
-    importType: 'frota',
-    rows: data.rows_data as RawRow[],
-    groups: [],
-    headers: data.headers_data as string[],
-    checkState: { checked: {}, spxToGroup: {} },
+    totalRows: data.total_orders,
+    outputRows: data.total_groups,
+    duplicatesRemoved: data.checked_groups,
+    headers: data.headers_data,
+    rows: data.rows_data,
+    importTime: data.import_time,
   };
 }
 
@@ -199,9 +174,7 @@ export async function updateExportEntry(
   groups: DeliveryGroup[],
   checkState: CheckState
 ): Promise<void> {
-  const checkedGroups = groups.filter((g) =>
-    g.spxTns.every((spx) => checkState.checked[spx])
-  ).length;
+  const checkedGroups = Object.values(checkState.checked).filter(Boolean).length;
 
   const { error } = await supabase
     .from('import_history')
@@ -213,7 +186,9 @@ export async function updateExportEntry(
     })
     .eq('id', id);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error updating export entry:', error);
+  }
 }
 
 export async function updateHistoryProgress(
@@ -221,9 +196,7 @@ export async function updateHistoryProgress(
   groups: DeliveryGroup[],
   checkState: CheckState
 ): Promise<void> {
-  const checkedGroups = groups.filter((g) =>
-    g.spxTns.every((spx) => checkState.checked[spx])
-  ).length;
+  const checkedGroups = Object.values(checkState.checked).filter(Boolean).length;
 
   const { error } = await supabase
     .from('import_history')
@@ -234,117 +207,69 @@ export async function updateHistoryProgress(
     })
     .eq('id', id);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error updating history progress:', error);
+  }
+}
+
+export async function deleteImportEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('import_history').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting import entry:', error);
+  }
 }
 
 export async function deleteHistoryEntry(id: string): Promise<void> {
-  const { error } = await supabase.from('import_history').delete().eq('id', id);
-  if (error) throw error;
+  await deleteImportEntry(id);
 }
 
-export async function findByFileName(fileName: string): Promise<HistoryEntry | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) return null;
-
-  const { data, error } = await supabase
-    .from('import_history')
-    .select('*')
-    .eq('user_id', session.user.id)
-    .eq('file_name', fileName)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return null;
-
-  return {
-    id: data.id,
-    user_id: data.user_id,
-    date: new Date(data.import_time).toLocaleDateString('pt-BR'),
-    importTime: new Date(data.import_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    exportTime: data.export_time
-      ? new Date(data.export_time).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null,
-    totalOrders: data.total_orders,
-    totalGroups: data.total_groups,
-    checkedGroups: data.checked_groups,
-    fileName: data.file_name,
-    importType: (data.import_type as ImportType) || 'flex',
-    rows: data.rows_data as RawRow[],
-    groups: data.groups_data as DeliveryGroup[],
-    headers: data.headers_data as string[],
-    checkState: data.check_state_data as CheckState,
-  };
-}
-
-export async function getAllHistoryAdmin(): Promise<HistoryEntry[]> {
-  const { data, error } = await supabase
-    .from('import_history')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (error || !data) return [];
-
-  return data.map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    date: new Date(item.import_time).toLocaleDateString('pt-BR'),
-    importTime: new Date(item.import_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    exportTime: item.export_time
-      ? new Date(item.export_time).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null,
-    totalOrders: item.total_orders,
-    totalGroups: item.total_groups,
-    checkedGroups: item.checked_groups,
-    checkedOrders: countCheckedOrders(item.check_state_data),
-    fileName: item.file_name,
-    importType: (item.import_type as ImportType) || 'flex',
-    rows: item.rows_data as RawRow[],
-    groups: item.groups_data as DeliveryGroup[],
-    headers: item.headers_data as string[],
-    checkState: item.check_state_data as CheckState,
-  }));
-}
-
-export function reexportXlsx(entry: HistoryEntry) {
-  const exportedRows: string[][] = [];
-  entry.groups.forEach((group) => {
-    const row = entry.rows[group.primaryRowIndex];
-    const allChecked = group.spxTns.every((spx) => entry.checkState.checked[spx]);
-    const newSequence = allChecked ? group.generatedSequence : row.sequence;
-    const newAddress = group.officialAddress || row.destinationAddress;
-    exportedRows.push([
+export function reexportXlsx(entry: HistoryEntry): void {
+  import('xlsx').then((XLSX) => {
+    const sheetData = [entry.headers, ...entry.rows.map((row) => [
       row.colA,
-      newSequence,
+      row.sequence,
       row.colC,
       row.spxTn,
-      newAddress,
+      row.destinationAddress,
       row.colF,
       row.colG,
       row.colH,
       row.colI,
       row.colJ,
       ...row.extra,
-    ]);
+    ])];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Entregas');
+    const baseName = entry.fileName.replace(/\.[^.]+$/, '');
+    XLSX.writeFile(wb, `${baseName}.xlsx`);
+  }).catch((err) => {
+    console.error('Failed to re-export XLSX:', err);
   });
-  const ws = XLSX.utils.aoa_to_sheet([entry.headers, ...exportedRows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Entregas');
-  const date = entry.date.replace(/\//g, '-');
-  XLSX.writeFile(wb, `entregas_${date}.xlsx`);
+}
+
+export async function findByFileName(fileName: string): Promise<HistoryEntry | null> {
+  const installationId = getInstallationId();
+  const { data, error } = await supabase
+    .from('import_history')
+    .select('*')
+    .eq('user_id', installationId)
+    .eq('file_name', fileName)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return mapHistoryEntry(data);
+}
+
+export async function clearImportHistory(): Promise<{ success: boolean; error?: string }> {
+  const installationId = getInstallationId();
+  const { error } = await supabase
+    .from('import_history')
+    .delete()
+    .eq('user_id', installationId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
 }

@@ -9,8 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: true,
-    persistSession: true,
+    autoRefreshToken: false,
+    persistSession: false,
     detectSessionInUrl: false,
   },
 });
@@ -26,68 +26,10 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string;
-          name: string;
-          phone: string | null;
-          is_admin: boolean;
-          active: boolean;
-          created_at: string;
-          last_login: string | null;
-          referral_code: string | null;
-        };
-        Insert: {
-          id: string;
-          name: string;
-          phone?: string | null;
-          is_admin?: boolean;
-          active?: boolean;
-          created_at?: string;
-          last_login?: string | null;
-          referral_code?: string | null;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          phone?: string | null;
-          is_admin?: boolean;
-          active?: boolean;
-          created_at?: string;
-          last_login?: string | null;
-          referral_code?: string | null;
-        };
-      };
-      licenses: {
-        Row: {
-          id: string;
-          user_id: string;
-          days: number;
-          is_free_trial: boolean;
-          created_at: string;
-          expires_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          days: number;
-          is_free_trial?: boolean;
-          created_at?: string;
-          expires_at: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          days?: number;
-          is_free_trial?: boolean;
-          created_at?: string;
-          expires_at?: string;
-        };
-      };
       import_history: {
         Row: {
           id: string;
-          user_id: string;
+          user_id: string | null;
           file_name: string;
           total_orders: number;
           total_groups: number;
@@ -103,7 +45,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          user_id: string;
+          user_id?: string | null;
           file_name: string;
           total_orders?: number;
           total_groups?: number;
@@ -119,7 +61,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
           file_name?: string;
           total_orders?: number;
           total_groups?: number;
@@ -134,97 +76,39 @@ export interface Database {
           import_type?: string | null;
         };
       };
-      payments: {
-        Row: {
-          id: string;
-          user_id: string;
-          amount: number | null;
-          status: string;
-          transaction_id: string | null;
-          payment_method: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          amount?: number | null;
-          status?: string;
-          transaction_id?: string | null;
-          payment_method?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          amount?: number | null;
-          status?: string;
-          transaction_id?: string | null;
-          payment_method?: string | null;
-          created_at?: string;
-        };
-      };
-      pix_settings: {
-        Row: {
-          id: string;
-          pix_key: string | null;
-          receiver_name: string | null;
-          city: string | null;
-          message: string | null;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          pix_key?: string | null;
-          receiver_name?: string | null;
-          city?: string | null;
-          message?: string | null;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          pix_key?: string | null;
-          receiver_name?: string | null;
-          city?: string | null;
-          message?: string | null;
-          updated_at?: string;
-        };
-      };
       app_settings: {
         Row: {
           id: string;
-          show_license_to_users: boolean;
           updated_at: string;
           tutorial_url: string | null;
-          max_devices_per_user: number | null;
-          trial_days: number | null;
-          referral_bonus_days: number | null;
-          referral_require_payment: boolean | null;
+          tutorial_interface_url: string | null;
+          tutorial_flex_url: string | null;
+          tutorial_frota_url: string | null;
+          apk_circuit_url: string | null;
         };
         Insert: {
           id?: string;
-          show_license_to_users?: boolean;
           updated_at?: string;
           tutorial_url?: string | null;
-          max_devices_per_user?: number | null;
-          trial_days?: number | null;
-          referral_bonus_days?: number | null;
-          referral_require_payment?: boolean | null;
+          tutorial_interface_url?: string | null;
+          tutorial_flex_url?: string | null;
+          tutorial_frota_url?: string | null;
+          apk_circuit_url?: string | null;
         };
         Update: {
           id?: string;
-          show_license_to_users?: boolean;
           updated_at?: string;
           tutorial_url?: string | null;
-          max_devices_per_user?: number | null;
-          trial_days?: number | null;
-          referral_bonus_days?: number | null;
-          referral_require_payment?: boolean | null;
+          tutorial_interface_url?: string | null;
+          tutorial_flex_url?: string | null;
+          tutorial_frota_url?: string | null;
+          apk_circuit_url?: string | null;
         };
       };
       active_sessions: {
         Row: {
           id: string;
-          user_id: string;
+          user_id: string | null;
           file_name: string;
           rows_data: Json;
           groups_data: Json;
@@ -238,7 +122,7 @@ export interface Database {
         };
         Insert: {
           id: string;
-          user_id?: string;
+          user_id?: string | null;
           file_name: string;
           rows_data?: Json;
           groups_data?: Json;
@@ -252,7 +136,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
           file_name?: string;
           rows_data?: Json;
           groups_data?: Json;
@@ -265,88 +149,65 @@ export interface Database {
           created_at?: string;
         };
       };
-      referral_codes: {
+      global_announcements: {
+        Row: {
+          id: string;
+          title: string;
+          message: string;
+          is_active: boolean;
+          display_location: string;
+          show_once_per_user: boolean;
+          require_confirmation: boolean;
+          start_date: string | null;
+          end_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          message: string;
+          is_active?: boolean;
+          display_location?: string;
+          show_once_per_user?: boolean;
+          require_confirmation?: boolean;
+          start_date?: string | null;
+          end_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          message?: string;
+          is_active?: boolean;
+          display_location?: string;
+          show_once_per_user?: boolean;
+          require_confirmation?: boolean;
+          start_date?: string | null;
+          end_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      announcement_confirmations: {
         Row: {
           id: string;
           user_id: string;
-          code: string;
-          created_at: string;
+          announcement_id: string;
+          confirmed_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          code: string;
-          created_at?: string;
+          announcement_id: string;
+          confirmed_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          code?: string;
-          created_at?: string;
-        };
-      };
-      referrals: {
-        Row: {
-          id: string;
-          referred_user_id: string;
-          referred_by_user_id: string;
-          referral_code: string;
-          status: string;
-          created_at: string;
-          bonified_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          referred_user_id: string;
-          referred_by_user_id: string;
-          referral_code: string;
-          status?: string;
-          created_at?: string;
-          bonified_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          referred_user_id?: string;
-          referred_by_user_id?: string;
-          referral_code?: string;
-          status?: string;
-          created_at?: string;
-          bonified_at?: string | null;
-        };
-      };
-      referral_bonuses: {
-        Row: {
-          id: string;
-          referrer_user_id: string;
-          referred_user_id: string;
-          referral_id: string;
-          days_granted: number;
-          reason: string;
-          trigger_type: string;
-          status: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          referrer_user_id: string;
-          referred_user_id: string;
-          referral_id: string;
-          days_granted: number;
-          reason: string;
-          trigger_type?: string;
-          status?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          referrer_user_id?: string;
-          referred_user_id?: string;
-          referral_id?: string;
-          days_granted?: number;
-          reason?: string;
-          trigger_type?: string;
-          status?: string;
-          created_at?: string;
+          announcement_id?: string;
+          confirmed_at?: string;
         };
       };
     };

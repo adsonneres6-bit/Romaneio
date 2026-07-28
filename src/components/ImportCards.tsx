@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
-import { Upload as UploadIcon, Loader2, Lock, Truck, Users, MapPin, FileSpreadsheet, Download } from 'lucide-react';
+import { Upload as UploadIcon, Loader2, Truck, Users, MapPin, FileSpreadsheet, Download } from 'lucide-react';
 import { importPdf } from '../services/importService';
-import { validateLicenseForImport } from '../services/validateLicenseService';
 import { findByFileName, addFrotaImportEntry, type HistoryEntry } from '../services/historyService';
 import { optimizeAddressesFile } from '../services/addressOptimizerService';
 import { optimizeFrotaFile } from '../services/frotaOptimizerService';
@@ -12,11 +11,10 @@ interface ImportCardsProps {
   onImport: (rows: RawRow[], headers: string[], fileName: string) => void;
   onError?: (message: string) => void;
   disabled?: boolean;
-  userId?: string;
   onResumeEntry: (entry: HistoryEntry) => void;
 }
 
-export function ImportCards({ onImport, onError, disabled = true, userId, onResumeEntry }: ImportCardsProps) {
+export function ImportCards({ onImport, onError, disabled = false, onResumeEntry }: ImportCardsProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -39,11 +37,6 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
       fileType: file.type || 'unknown',
     });
 
-    if (!userId) {
-      onError?.('Usuario nao identificado. Faca login novamente.');
-      return;
-    }
-
     setValidating(true);
     setFileName(file.name);
 
@@ -61,19 +54,7 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
         return;
       }
 
-      const validation = await validateLicenseForImport(userId);
-
-      if (!validation.valid) {
-        console.warn('[IMPORT CARDS] License validation failed', {
-          message: validation.message,
-        });
-        onError?.(validation.message || 'Sua licenca esta vencida. Renove para importar arquivos.');
-        setValidating(false);
-        setFileName(null);
-        return;
-      }
-
-      console.log('[IMPORT CARDS] License validated, starting import');
+      console.log('[IMPORT CARDS] Starting import');
       setValidating(false);
       setLoading(true);
 
@@ -118,7 +99,7 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
   };
 
   const handleImportAnyway = async () => {
-    if (!pendingFile || !userId) return;
+    if (!pendingFile) return;
 
     console.log('[IMPORT CARDS] Import anyway (duplicate)', {
       fileName: pendingFile.name,
@@ -129,16 +110,6 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
     setValidating(true);
 
     try {
-      const validation = await validateLicenseForImport(userId);
-
-      if (!validation.valid) {
-        onError?.(validation.message || 'Sua licenca esta vencida. Renove para importar arquivos.');
-        setValidating(false);
-        setFileName(null);
-        setPendingFile(null);
-        return;
-      }
-
       setValidating(false);
       setLoading(true);
 
@@ -311,7 +282,7 @@ export function ImportCards({ onImport, onError, disabled = true, userId, onResu
               </>
             ) : disabled ? (
               <>
-                <Lock className="h-4 w-4" />
+                <UploadIcon className="h-4 w-4" />
                 Importar PDF
               </>
             ) : (

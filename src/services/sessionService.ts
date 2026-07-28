@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getInstallationId } from './installationService';
 import type { RawRow, DeliveryGroup, CheckState } from '../types';
 
 export interface ActiveSession {
@@ -14,15 +15,12 @@ export interface ActiveSession {
 }
 
 export async function getActiveSession(): Promise<ActiveSession | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) return null;
+  const installationId = getInstallationId();
 
   const { data, error } = await supabase
     .from('active_sessions')
     .select('*')
-    .eq('user_id', session.user.id)
+    .eq('user_id', installationId)
     .maybeSingle();
 
   if (error || !data) return null;
@@ -48,11 +46,7 @@ export async function saveActiveSession(
   headers: string[],
   checkState: CheckState
 ): Promise<void> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) return;
-
+  const installationId = getInstallationId();
   const checkedCount = Object.values(checkState.checked).filter(Boolean).length;
 
   const { error } = await supabase
@@ -60,7 +54,7 @@ export async function saveActiveSession(
     .upsert(
       {
         id: historyId,
-        user_id: session.user.id,
+        user_id: installationId,
         file_name: fileName,
         rows_data: rows,
         groups_data: groups,
@@ -80,15 +74,12 @@ export async function saveActiveSession(
 }
 
 export async function clearActiveSession(): Promise<void> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) return;
+  const installationId = getInstallationId();
 
   const { error } = await supabase
     .from('active_sessions')
     .delete()
-    .eq('user_id', session.user.id);
+    .eq('user_id', installationId);
 
   if (error) {
     console.error('Failed to clear active session:', error.message);
