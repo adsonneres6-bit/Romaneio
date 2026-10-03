@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, ScanLine, SwitchCamera } from 'lucide-react';
+import { Camera, CameraOff, ScanLine, SwitchCamera, Volume2, VolumeX } from 'lucide-react';
 import { ScannerService } from '../services/scannerService';
 
 interface ScannerProps {
@@ -7,11 +7,13 @@ interface ScannerProps {
   onError: (msg: string) => void;
   lastSequence: string | null;
   alreadyRead: boolean;
+  voiceEnabled: boolean;
+  onToggleVoice: () => void;
 }
 
 const SCAN_DELAY_MS = 3500;
 
-export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerProps) {
+export function Scanner({ onScan, onError, lastSequence, alreadyRead, voiceEnabled, onToggleVoice }: ScannerProps) {
   const scannerRef = useRef<ScannerService | null>(null);
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -93,14 +95,27 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
           </div>
         )}
         {active && (
-          <button
-            onClick={handleSwitchCamera}
-            disabled={starting}
-            className="absolute top-3 right-3 z-10 flex items-center justify-center rounded-xl bg-black/60 p-2.5 text-white backdrop-blur transition-colors hover:bg-black/80 disabled:opacity-50"
-            title={facingMode === 'environment' ? 'Trocar para frontal' : 'Trocar para traseira'}
-          >
-            <SwitchCamera className="h-5 w-5" />
-          </button>
+          <div className="absolute top-3 right-3 z-10 flex gap-2">
+            <button
+              onClick={onToggleVoice}
+              className={`flex items-center justify-center rounded-xl p-2.5 backdrop-blur transition-colors ${
+                voiceEnabled
+                  ? 'bg-black/60 text-white hover:bg-black/80'
+                  : 'bg-black/60 text-slate-400 hover:bg-black/80'
+              }`}
+              title={voiceEnabled ? 'Desativar voz' : 'Ativar voz'}
+            >
+              {voiceEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            </button>
+            <button
+              onClick={handleSwitchCamera}
+              disabled={starting}
+              className="flex items-center justify-center rounded-xl bg-black/60 p-2.5 text-white backdrop-blur transition-colors hover:bg-black/80 disabled:opacity-50"
+              title={facingMode === 'environment' ? 'Trocar para frontal' : 'Trocar para traseira'}
+            >
+              <SwitchCamera className="h-5 w-5" />
+            </button>
+          </div>
         )}
       </div>
 

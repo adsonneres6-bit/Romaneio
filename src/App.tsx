@@ -16,6 +16,7 @@ import {
   getTotalCount,
 } from './services/checkService';
 import { playSuccess, playError, playWarning } from './services/soundService';
+import { speakSequence } from './services/voiceService';
 import { ImportCards } from './components/ImportCards';
 import { Dashboard } from './components/Dashboard';
 import { Scanner } from './components/Scanner';
@@ -73,6 +74,9 @@ function App() {
   });
   const [lastSequence, setLastSequence] = useState<string | null>(null);
   const [alreadyRead, setAlreadyRead] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(() => {
+    try { return localStorage.getItem('voiceEnabled') !== 'false'; } catch { return true; }
+  });
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const [showUpload, setShowUpload] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -300,6 +304,17 @@ function App() {
     finalizeImport(pendingImport.rows, pendingImport.headers, false, pendingImport.fileName);
   }, [pendingImport, finalizeImport]);
 
+  const voiceEnabledRef = useRef(voiceEnabled);
+  voiceEnabledRef.current = voiceEnabled;
+
+  const handleToggleVoice = useCallback(() => {
+    setVoiceEnabled((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('voiceEnabled', String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   const handleScan = useCallback(
     (decoded: string) => {
       const currentGroups = groupsRef.current;
@@ -327,6 +342,7 @@ function App() {
           alreadyRead: true,
           lastReadSequence: result.individualSequence,
         });
+        if (voiceEnabledRef.current) speakSequence(result.individualSequence, result.group.spxTns.length > 1);
         return;
       }
 
@@ -339,6 +355,7 @@ function App() {
         alreadyRead: false,
         lastReadSequence: result.individualSequence,
       });
+      if (voiceEnabledRef.current) speakSequence(result.individualSequence, result.group.spxTns.length > 1);
 
       const newGroups = [...currentGroups];
       const newState = { ...currentState };
@@ -556,6 +573,8 @@ function App() {
                 onError={handleScannerError}
                 lastSequence={lastSequence}
                 alreadyRead={alreadyRead}
+                voiceEnabled={voiceEnabled}
+                onToggleVoice={handleToggleVoice}
               />
 
               <Dashboard total={total} stops={groups.length} checked={checked} />
