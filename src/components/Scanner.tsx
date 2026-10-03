@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, ScanLine } from 'lucide-react';
+import { Camera, CameraOff, ScanLine, SwitchCamera } from 'lucide-react';
 import { ScannerService } from '../services/scannerService';
 
 interface ScannerProps {
@@ -16,6 +16,7 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cooldown, setCooldown] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const lastScanRef = useRef(0);
   const lastCodeRef = useRef<string | null>(null);
 
@@ -26,16 +27,14 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
     };
   }, []);
 
-  const handleStart = async () => {
+  const startCamera = async (mode: 'environment' | 'user') => {
     setStarting(true);
     try {
       await scannerRef.current?.start(
         'qr-reader',
         (decoded) => {
           const now = Date.now();
-          // Ignora se mesmo código lido nos últimos 500ms (evita duplicata imediata)
           if (decoded === lastCodeRef.current && now - lastScanRef.current < 500) return;
-          // Delay de 3s entre leituras
           if (now - lastScanRef.current < SCAN_DELAY_MS) return;
           lastScanRef.current = now;
           lastCodeRef.current = decoded;
@@ -44,6 +43,7 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
           setTimeout(() => setCooldown(false), SCAN_DELAY_MS);
         },
         (err) => onError(err),
+        mode,
       );
       setActive(true);
     } catch (err) {
@@ -53,9 +53,25 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
     }
   };
 
+  const handleStart = async () => {
+    await startCamera(facingMode);
+  };
+
   const handleStop = async () => {
     await scannerRef.current?.stop();
     setActive(false);
+  };
+
+  const handleSwitchCamera = async () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    if (active) {
+      await scannerRef.current?.stop();
+      setActive(false);
+      setFacingMode(nextMode);
+      await startCamera(nextMode);
+    } else {
+      setFacingMode(nextMode);
+    }
   };
 
   return (
@@ -75,6 +91,16 @@ export function Scanner({ onScan, onError, lastSequence, alreadyRead }: ScannerP
         {active && cooldown && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-xs font-medium text-white backdrop-blur">
           </div>
+        )}
+        {active && (
+          <button
+            onClick={handleSwitchCamera}
+            disabled={starting}
+            className="absolute top-3 right-3 z-10 flex items-center justify-center rounded-xl bg-black/60 p-2.5 text-white backdrop-blur transition-colors hover:bg-black/80 disabled:opacity-50"
+            title={facingMode === 'environment' ? 'Trocar para frontal' : 'Trocar para traseira'}
+          >
+            <SwitchCamera className="h-5 w-5" />
+          </button>
         )}
       </div>
 

@@ -29,6 +29,7 @@ export function ImportCards({ onImport, onError, disabled = false, onResumeEntry
   const frotaInputRef = useRef<HTMLInputElement>(null);
   const [frotaLoading, setFrotaLoading] = useState(false);
   const [frotaResult, setFrotaResult] = useState<{ blob: Blob; fileName: string } | null>(null);
+  const [frotaStats, setFrotaStats] = useState<{ totalRows: number; outputRows: number; duplicatesRemoved: number } | null>(null);
 
   const processFile = async (file: File) => {
     console.log('[IMPORT CARDS] Starting file processing', {
@@ -177,6 +178,7 @@ export function ImportCards({ onImport, onError, disabled = false, onResumeEntry
 
   const handleFrotaFile = async (file: File) => {
     setFrotaResult(null);
+    setFrotaStats(null);
     setFrotaLoading(true);
 
     try {
@@ -202,6 +204,11 @@ export function ImportCards({ onImport, onError, disabled = false, onResumeEntry
       }
 
       setFrotaResult({ blob: result.blob, fileName: result.outputFileName });
+      setFrotaStats({
+        totalRows: result.totalRows,
+        outputRows: result.outputRows,
+        duplicatesRemoved: result.duplicatesRemoved,
+      });
     } catch (err) {
       console.error(err);
       const msg = err instanceof Error ? err.message : 'Erro ao processar arquivo Frota.';
@@ -222,6 +229,7 @@ export function ImportCards({ onImport, onError, disabled = false, onResumeEntry
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setFrotaResult(null);
+    setFrotaStats(null);
   };
 
   return (
@@ -324,11 +332,34 @@ export function ImportCards({ onImport, onError, disabled = false, onResumeEntry
             Padronize endereços, una duplicatas e consolide sequências.
           </p>
 
-          {frotaResult && !frotaLoading && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg bg-blue-50 p-2.5 dark:bg-blue-900/20">
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Arquivo processado com sucesso! Clique no botão abaixo para fazer o download.
-              </p>
+          {frotaStats && frotaResult && !frotaLoading && (
+            <div className="mb-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-slate-100 p-2.5 text-center dark:bg-slate-700/50">
+                  <p className="text-lg font-bold text-slate-900 dark:text-white">
+                    {frotaStats.totalRows}
+                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Pedidos
+                  </p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-2.5 text-center dark:bg-blue-900/30">
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    {frotaStats.duplicatesRemoved}
+                  </p>
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                    Unificados
+                  </p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-2.5 text-center dark:bg-emerald-900/30">
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    {frotaStats.outputRows}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                    Paradas
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

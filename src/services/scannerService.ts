@@ -10,6 +10,7 @@ export class ScannerService {
     elementId: string,
     onScan: (decoded: string) => void,
     onError?: (error: string) => void,
+    facingMode: 'environment' | 'user' = 'environment',
   ): Promise<void> {
     if (this.scanning) return;
 
@@ -28,12 +29,15 @@ export class ScannerService {
     video.style.height = '100%';
     video.style.objectFit = 'cover';
     video.style.borderRadius = '1rem';
+    if (facingMode === 'user') {
+      video.style.transform = 'scaleX(-1)';
+    }
     container.appendChild(video);
     this.video = video;
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: { facingMode: { ideal: facingMode } },
         audio: false,
       });
       video.srcObject = this.stream;
